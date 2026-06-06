@@ -46,6 +46,38 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ─── Player lookup (with correct signing) ────────────────────────────────────
+app.post('/api/lookup-player', async (req, res) => {
+  const { fid } = req.body;
+  if (!fid) return res.status(400).json({ error: 'FID 必填' });
+
+  const secret = 'tB87#kPtkxqOS2';
+  const ts = String(Math.floor(Date.now() / 1000));
+  const data = { fid: String(fid), time: ts };
+  const sortedKeys = Object.keys(data).sort();
+  const encoded = sortedKeys.map(k => `${k}=${data[k]}`).join('&');
+  const sign = crypto.createHash('md5').update(encoded + secret).digest('hex');
+
+  const body = new URLSearchParams({ fid: String(fid), time: ts, sign }).toString();
+
+  try {
+    const response = await fetch('https://wos-giftcode-api.centurygame.com/api/player', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://wos-giftcode.centurygame.com',
+        'referer': 'https://wos-giftcode.centurygame.com/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36'
+      },
+      body
+    });
+    const result = await response.json();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: '無法連接遊戲伺服器', detail: err.message });
+  }
+});
+
 // ─── Get all bookings ────────────────────────────────────────────────────────
 app.get('/api/bookings', (req, res) => {
   res.json(loadBookings());
@@ -53,14 +85,14 @@ app.get('/api/bookings', (req, res) => {
 
 // ─── Create booking ──────────────────────────────────────────────────────────
 app.post('/api/bookings', (req, res) => {
-  const { slot, buff, name, fid } = req.body;
+  const { slot, buff, name, fid, avatar } = req.body;
   if (slot === undefined || !buff || !name || !fid) {
     return res.status(400).json({ error: '資料不完整' });
   }
   const key = `${slot}_${buff}`;
   const bookings = loadBookings();
   if (bookings[key]) return res.status(409).json({ error: '此時段已被預約 / Slot already booked' });
-  bookings[key] = { name, fid: String(fid), bookedAt: new Date().toISOString() };
+  bookings[key] = { name, fid: String(fid), avatar: avatar || '', bookedAt: new Date().toISOString() };
   saveBookings(bookings);
   res.json({ success: true });
 });

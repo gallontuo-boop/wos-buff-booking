@@ -89,8 +89,16 @@
   .btn-confirm:hover:not(:disabled) { background: rgba(31,111,235,0.28); }
   .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .status-box { font-size: 13px; padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; display: none; }
+  .btn-query { padding: 11px 16px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-size: 14px; font-family: inherit; cursor: pointer; white-space: nowrap; transition: all 0.12s; }
+  .btn-query:hover { background: var(--bg3); color: var(--text); }
+  .btn-query:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-box { font-size: 13px; padding: 10px 14px; border-radius: var(--radius); margin-bottom: 14px; display: none; }
+  .status-loading { background: rgba(139,148,158,0.1); color: var(--text2); border: 1px solid var(--border); }
+  .status-ok  { background: rgba(63,185,80,0.12); color: #7ee787; border: 1px solid rgba(63,185,80,0.3); }
   .status-err { background: rgba(248,81,73,0.12); color: #ffa198; border: 1px solid rgba(248,81,73,0.3); }
+
+  .player-card { display: none; align-items: center; gap: 14px; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); padding: 14px; margin-bottom: 18px; }
 
   .footer-note { margin-top: 28px; font-size: 13px; color: var(--text3); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; line-height: 1.8; }
   .refresh-info { font-size: 12px; color: var(--text3); text-align: right; margin-bottom: 10px; }
@@ -144,19 +152,25 @@
     <p class="modal-meta" id="modalMeta"></p>
 
     <label class="form-label">玩家 FID <span class="en">/ Player FID</span></label>
-    <input class="form-input" type="number" id="fidInput" placeholder="輸入遊戲內 FID / Enter your in-game FID" min="1">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input class="form-input" type="number" id="fidInput" placeholder="輸入 FID / Enter FID" min="1" style="margin-bottom:0;flex:1">
+      <button class="btn-query" id="queryBtn" onclick="lookupPlayer()">查詢 / Search</button>
+    </div>
 
-    <label class="form-label">遊戲名稱 <span class="en">/ In-game Name</span></label>
-    <input class="form-input" type="text" id="nameInput" placeholder="輸入遊戲內名稱 / Enter your in-game name" maxlength="30">
+    <div class="status-box" id="statusBox"></div>
 
-    <div class="hint">請確保 FID 與名稱正確，錯誤預約由管理員協助刪除。<br>
-    Ensure FID and name are correct. Ask admin to fix any errors.</div>
-
-    <div class="status-box status-err" id="statusBox"></div>
+    <div class="player-card" id="playerCard">
+      <img id="pcAvatar" src="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);flex-shrink:0;display:none">
+      <div class="pc-icon" id="pcIcon" style="width:48px;height:48px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">👤</div>
+      <div>
+        <div style="font-size:16px;font-weight:700" id="pcName"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px" id="pcMeta"></div>
+      </div>
+    </div>
 
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">取消 / Cancel</button>
-      <button class="btn-confirm" id="confirmBtn" onclick="confirmBooking()">確認預約 / Confirm</button>
+      <button class="btn-confirm" id="confirmBtn" onclick="confirmBooking()" disabled>確認預約 / Confirm</button>
     </div>
   </div>
 </div>
@@ -167,6 +181,7 @@ const BUFF_ZH = {build:'建築', research:'研發', train:'練兵'};
 const BUFF_EN = {build:'Building', research:'Research', train:'Training'};
 let bookings = {};
 let pendingSlot = null;
+let verifiedPlayer = null;
 
 function tLabel(i) {
   return String(Math.floor(i/2)).padStart(2,'0') + (i%2===0?':00':':30');
@@ -191,8 +206,11 @@ function renderSlots() {
       const key = `${s}_${buff}`;
       const entry = bookings[key];
       if (entry) {
+        const avatarEl = entry.avatar
+          ? `<img src="${esc(entry.avatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border2);flex-shrink:0" onerror="this.style.display='none'">`
+          : `<div class="slot-avatar-icon">👤</div>`;
         html += `<div class="slot taken taken-${buff}">
-          <div class="slot-avatar-icon">👤</div>
+          ${avatarEl}
           <div class="slot-info">
             <div class="slot-name ${buff}">${esc(entry.name)}</div>
             <div class="slot-fid">FID: ${esc(entry.fid)}</div>
@@ -209,16 +227,74 @@ function renderSlots() {
 
 function openModal(slot, buff) {
   pendingSlot = {slot, buff};
+  verifiedPlayer = null;
   document.getElementById('modalTitle').childNodes[0].textContent = `預約 ${BUFF_ZH[buff]} BUFF `;
   document.getElementById('modalTitleEn').textContent = `Book ${BUFF_EN[buff]} BUFF`;
   const endLabel = slot < 47 ? tLabel(slot+1) : '24:00';
   document.getElementById('modalMeta').textContent = `${tLabel(slot)} – ${endLabel}`;
   document.getElementById('fidInput').value = '';
-  document.getElementById('nameInput').value = '';
-  document.getElementById('statusBox').style.display = 'none';
-  document.getElementById('confirmBtn').disabled = false;
+  const sb = document.getElementById('statusBox');
+  sb.style.display = 'none'; sb.className = 'status-box';
+  document.getElementById('playerCard').style.display = 'none';
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('queryBtn').disabled = false;
   document.getElementById('overlay').classList.add('open');
   setTimeout(() => document.getElementById('fidInput').focus(), 60);
+}
+
+async function lookupPlayer() {
+  const fid = document.getElementById('fidInput').value.trim();
+  if (!fid) return;
+  const sb = document.getElementById('statusBox');
+  const pc = document.getElementById('playerCard');
+  const qBtn = document.getElementById('queryBtn');
+  qBtn.disabled = true;
+  verifiedPlayer = null;
+  document.getElementById('confirmBtn').disabled = true;
+  pc.style.display = 'none';
+  sb.className = 'status-box status-loading';
+  sb.textContent = '⏳ 查詢中... / Searching...';
+  sb.style.display = 'block';
+
+  try {
+    const res = await fetch('/api/lookup-player', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({fid})
+    });
+    const data = await res.json();
+    if (data.code === 0 && data.data) {
+      const p = data.data;
+      const kid = String(p.kid || '');
+      if (kid !== '483') {
+        sb.className = 'status-box status-err';
+        sb.textContent = `⚠️ 此玩家不屬於 State 483（目前：State ${kid || '未知'}）/ This player is not in State 483`;
+      } else {
+        verifiedPlayer = { fid, name: p.nickname || `玩家${fid}`, avatar: p.avatar_image || '', stoveLv: p.stove_lv || '' };
+        sb.className = 'status-box status-ok';
+        sb.textContent = `✓ 已確認 State 483 玩家 / Confirmed State 483 player`;
+        document.getElementById('pcName').textContent = verifiedPlayer.name;
+        document.getElementById('pcMeta').textContent = `FID: ${fid}  ·  State ${kid}  ·  爐子 Lv.${verifiedPlayer.stoveLv}`;
+        if (verifiedPlayer.avatar) {
+          const img = document.getElementById('pcAvatar');
+          img.src = verifiedPlayer.avatar;
+          img.style.display = 'block';
+          document.getElementById('pcIcon').style.display = 'none';
+        } else {
+          document.getElementById('pcAvatar').style.display = 'none';
+          document.getElementById('pcIcon').style.display = 'flex';
+        }
+        pc.style.display = 'flex';
+        document.getElementById('confirmBtn').disabled = false;
+      }
+    } else {
+      sb.className = 'status-box status-err';
+      sb.textContent = '找不到此 FID 的玩家，請確認號碼是否正確。/ Player not found, check your FID.';
+    }
+  } catch(e) {
+    sb.className = 'status-box status-err';
+    sb.textContent = '查詢失敗，請稍後再試。/ Lookup failed, please retry.';
+  }
+  qBtn.disabled = false;
 }
 
 function closeModal() {
@@ -233,13 +309,7 @@ function showError(msg) {
 }
 
 async function confirmBooking() {
-  const fid  = document.getElementById('fidInput').value.trim();
-  const name = document.getElementById('nameInput').value.trim();
-
-  if (!fid)  { showError('請輸入 FID / Please enter your FID'); return; }
-  if (!name) { showError('請輸入遊戲名稱 / Please enter your in-game name'); return; }
-  if (!pendingSlot) return;
-
+  if (!verifiedPlayer || !pendingSlot) return;
   const {slot, buff} = pendingSlot;
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true;
@@ -248,7 +318,7 @@ async function confirmBooking() {
     const res = await fetch('/api/bookings', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slot, buff, name, fid})
+      body: JSON.stringify({slot, buff, name: verifiedPlayer.name, fid: verifiedPlayer.fid, avatar: verifiedPlayer.avatar})
     });
     const data = await res.json();
     if (data.success) {
@@ -265,11 +335,7 @@ async function confirmBooking() {
 }
 
 document.getElementById('fidInput').addEventListener('keydown', e => {
-  if (e.key === 'Tab')    { e.preventDefault(); document.getElementById('nameInput').focus(); }
-  if (e.key === 'Escape') closeModal();
-});
-document.getElementById('nameInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter')  confirmBooking();
+  if (e.key === 'Enter')  lookupPlayer();
   if (e.key === 'Escape') closeModal();
 });
 document.getElementById('overlay').addEventListener('click', e => {
