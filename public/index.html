@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寒霜啟示錄 State 483 — 準備週 BUFF 預約 / Prep Week BUFF Booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.22);
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+    --build: #1f6feb; --build-bg: rgba(31,111,235,0.15); --build-border: rgba(31,111,235,0.4);
+    --research: #3fb950; --research-bg: rgba(63,185,80,0.15); --research-border: rgba(63,185,80,0.4);
+    --train: #d29922; --train-bg: rgba(210,153,34,0.15); --train-border: rgba(210,153,34,0.4);
+    --radius: 8px; --danger: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; font-size: 15px; }
+
+  .top-bar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .top-bar-title h1 { font-size: 17px; font-weight: 700; }
+  .top-bar-title .sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .badge { font-size: 12px; background: var(--build-bg); color: #58a6ff; border: 1px solid var(--build-border); border-radius: 20px; padding: 4px 12px; margin-left: 12px; }
+
+  .main { max-width: 1000px; margin: 0 auto; padding: 28px 16px; }
+
+  .legend { display: flex; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text2); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .grid-inner { min-width: 480px; }
+  .grid-header { display: grid; grid-template-columns: 56px 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px; padding: 0 2px; }
+  .grid-header span { font-size: 14px; font-weight: 700; text-align: center; color: var(--text); padding: 10px 4px; background: var(--bg3); border-radius: 6px; border: 1px solid var(--border2); }
+  .grid-header span .en { display: block; font-size: 11px; color: var(--text2); font-weight: 400; margin-top: 2px; }
+
+  .slot-row { display: grid; grid-template-columns: 56px 1fr 1fr 1fr; gap: 5px; margin-bottom: 4px; align-items: stretch; }
+  .time-lbl { font-size: 12px; color: var(--text3); text-align: right; padding-right: 8px; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: flex-end; }
+  .slot { min-height: 52px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); display: flex; align-items: center; padding: 6px 8px; gap: 6px; cursor: pointer; transition: all 0.12s; }
+  .slot:hover:not(.taken) { border-color: var(--border2); background: var(--bg3); }
+  .slot.taken { cursor: default; }
+  .slot.taken-build    { background: var(--build-bg);    border-color: var(--build-border); }
+  .slot.taken-research { background: var(--research-bg); border-color: var(--research-border); }
+  .slot.taken-train    { background: var(--train-bg);    border-color: var(--train-border); }
+
+  .slot-info { min-width: 0; flex: 1; }
+  .slot-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-name.build    { color: #79c0ff; }
+  .slot-name.research { color: #7ee787; }
+  .slot-name.train    { color: #e3b341; }
+  .slot-fid { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* 手機版 Mobile */
+  @media (max-width: 480px) {
+    .top-bar { padding: 12px 14px; }
+    .top-bar-title h1 { font-size: 14px; }
+    .top-bar-title .sub { display: none; }
+    .badge { padding: 3px 8px; font-size: 11px; margin-left: 8px; }
+    .main { padding: 16px 10px; }
+    .legend { gap: 14px; }
+    .legend-item { font-size: 13px; }
+    .modal { padding: 20px 16px; }
+    .modal h2 { font-size: 17px; }
+    .form-input { font-size: 16px; } /* 防止 iOS 自動縮放 */
+  }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 100%; max-width: 420px; }
+  .modal h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .modal h2 .en { font-size: 14px; font-weight: 400; color: var(--text2); }
+  .modal-meta { font-size: 14px; color: var(--text2); margin-bottom: 24px; margin-top: 4px; }
+
+  .form-label { font-size: 13px; color: var(--text2); margin-bottom: 8px; display: block; font-weight: 500; }
+  .form-label .en { color: var(--text3); font-weight: 400; }
+  .form-input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-size: 16px; font-family: inherit; padding: 11px 14px; outline: none; margin-bottom: 16px; }
+  .form-input:focus { border-color: #58a6ff; }
+  .form-input::placeholder { color: var(--text3); font-size: 14px; }
+
+  .hint { font-size: 12px; color: var(--text3); margin-top: -10px; margin-bottom: 18px; line-height: 1.6; }
+
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .btn-cancel  { padding: 10px 22px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-size: 14px; font-family: inherit; cursor: pointer; }
+  .btn-cancel:hover { background: var(--bg3); }
+  .btn-confirm { padding: 10px 22px; background: var(--build-bg); border: 1px solid var(--build-border); border-radius: var(--radius); color: #79c0ff; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: 600; transition: all 0.12s; }
+  .btn-confirm:hover:not(:disabled) { background: rgba(31,111,235,0.28); }
+  .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-box { font-size: 13px; padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; display: none; }
+  .status-err { background: rgba(248,81,73,0.12); color: #ffa198; border: 1px solid rgba(248,81,73,0.3); }
+
+  .footer-note { margin-top: 28px; font-size: 13px; color: var(--text3); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; line-height: 1.8; }
+  .refresh-info { font-size: 12px; color: var(--text3); text-align: right; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div style="display:flex;align-items:center">
+    <div class="top-bar-title">
+      <h1>⚔️ 寒霜啟示錄 — 準備週 BUFF 預約</h1>
+      <div class="sub">Whiteout Survival — Prep Week BUFF Booking</div>
+    </div>
+    <span class="badge">State 483</span>
+  </div>
+  <a href="admin.html" style="font-size:13px;color:var(--text3);text-decoration:none">後台 / Admin</a>
+</div>
+
+<div class="main">
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--build)"></div>建築 BUFF / Building</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--research)"></div>研發 BUFF / Research</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--train)"></div>練兵 BUFF / Training</div>
+  </div>
+
+  <div class="refresh-info" id="refreshInfo">載入中... / Loading...</div>
+
+  <div class="grid-wrap">
+    <div class="grid-inner">
+    <div class="grid-header">
+      <span style="background:transparent;border-color:transparent"></span>
+      <span>🏗 建築<span class="en">Building</span></span>
+      <span>🔬 研發<span class="en">Research</span></span>
+      <span>⚔️ 練兵<span class="en">Training</span></span>
+    </div>
+    <div id="slotsContainer"></div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    💡 點擊空格即可預約，填入你的 FID 及遊戲名稱即可完成。<br>
+    Click any empty slot to book — enter your FID and in-game name to confirm.<br>
+    預約錯誤請聯絡盟主，由後台管理員協助修改。／ Contact your leader for corrections.
+  </div>
+</div>
+
+<!-- Booking Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">預約 BUFF <span class="en" id="modalTitleEn"></span></h2>
+    <p class="modal-meta" id="modalMeta"></p>
+
+    <label class="form-label">玩家 FID <span class="en">/ Player FID</span></label>
+    <input class="form-input" type="number" id="fidInput" placeholder="輸入遊戲內 FID / Enter your in-game FID" min="1">
+
+    <label class="form-label">遊戲名稱 <span class="en">/ In-game Name</span></label>
+    <input class="form-input" type="text" id="nameInput" placeholder="輸入遊戲內名稱 / Enter your in-game name" maxlength="30">
+
+    <div class="hint">請確保 FID 與名稱正確，錯誤預約由管理員協助刪除。<br>
+    Ensure FID and name are correct. Ask admin to fix any errors.</div>
+
+    <div class="status-box status-err" id="statusBox"></div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">取消 / Cancel</button>
+      <button class="btn-confirm" id="confirmBtn" onclick="confirmBooking()">確認預約 / Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BUFFS = ['build','research','train'];
+const BUFF_ZH = {build:'建築', research:'研發', train:'練兵'};
+const BUFF_EN = {build:'Building', research:'Research', train:'Training'};
+let bookings = {};
+let pendingSlot = null;
+
+function tLabel(i) {
+  return String(Math.floor(i/2)).padStart(2,'0') + (i%2===0?':00':':30');
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function fetchBookings() {
+  try {
+    const r = await fetch('/api/bookings');
+    bookings = await r.json();
+    const now = new Date().toLocaleTimeString('zh-TW');
+    document.getElementById('refreshInfo').textContent = `最後更新 / Last updated: ${now}`;
+  } catch(e) { console.error(e); }
+  renderSlots();
+}
+
+function renderSlots() {
+  let html = '';
+  for (let s = 0; s < 48; s++) {
+    html += `<div class="slot-row"><div class="time-lbl">${tLabel(s)}</div>`;
+    for (const buff of BUFFS) {
+      const key = `${s}_${buff}`;
+      const entry = bookings[key];
+      if (entry) {
+        html += `<div class="slot taken taken-${buff}">
+          <div class="slot-avatar-icon">👤</div>
+          <div class="slot-info">
+            <div class="slot-name ${buff}">${esc(entry.name)}</div>
+            <div class="slot-fid">FID: ${esc(entry.fid)}</div>
+          </div>
+        </div>`;
+      } else {
+        html += `<div class="slot" onclick="openModal(${s},'${buff}')"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  document.getElementById('slotsContainer').innerHTML = html;
+}
+
+function openModal(slot, buff) {
+  pendingSlot = {slot, buff};
+  document.getElementById('modalTitle').childNodes[0].textContent = `預約 ${BUFF_ZH[buff]} BUFF `;
+  document.getElementById('modalTitleEn').textContent = `Book ${BUFF_EN[buff]} BUFF`;
+  const endLabel = slot < 47 ? tLabel(slot+1) : '24:00';
+  document.getElementById('modalMeta').textContent = `${tLabel(slot)} – ${endLabel}`;
+  document.getElementById('fidInput').value = '';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('statusBox').style.display = 'none';
+  document.getElementById('confirmBtn').disabled = false;
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(() => document.getElementById('fidInput').focus(), 60);
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  pendingSlot = null;
+}
+
+function showError(msg) {
+  const sb = document.getElementById('statusBox');
+  sb.textContent = msg;
+  sb.style.display = 'block';
+}
+
+async function confirmBooking() {
+  const fid  = document.getElementById('fidInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+
+  if (!fid)  { showError('請輸入 FID / Please enter your FID'); return; }
+  if (!name) { showError('請輸入遊戲名稱 / Please enter your in-game name'); return; }
+  if (!pendingSlot) return;
+
+  const {slot, buff} = pendingSlot;
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slot, buff, name, fid})
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeModal();
+      fetchBookings();
+    } else {
+      showError('預約失敗 / Failed: ' + (data.error || '未知錯誤'));
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showError('網路錯誤，請重試 / Network error, please retry');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('fidInput').addEventListener('keydown', e => {
+  if (e.key === 'Tab')    { e.preventDefault(); document.getElementById('nameInput').focus(); }
+  if (e.key === 'Escape') closeModal();
+});
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter')  confirmBooking();
+  if (e.key === 'Escape') closeModal();
+});
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) closeModal();
+});
+
+fetchBookings();
+setInterval(fetchBookings, 15000);
+</script>
+</body>
+</html>

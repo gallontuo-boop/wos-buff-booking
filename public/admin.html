@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>後台管理 / Admin — WoS 483 BUFF 預約</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.22);
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+    --build: #1f6feb; --build-bg: rgba(31,111,235,0.15); --build-border: rgba(31,111,235,0.4);
+    --research: #3fb950; --research-bg: rgba(63,185,80,0.15); --research-border: rgba(63,185,80,0.4);
+    --train: #d29922; --train-bg: rgba(210,153,34,0.15); --train-border: rgba(210,153,34,0.4);
+    --danger: #f85149; --danger-bg: rgba(248,81,73,0.12); --danger-border: rgba(248,81,73,0.4);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; font-size: 15px; }
+
+  /* Login */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .login-box { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 380px; }
+  .login-box h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .login-box p { font-size: 14px; color: var(--text2); margin-bottom: 28px; }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { font-size: 13px; color: var(--text2); font-weight: 500; display: block; margin-bottom: 7px; }
+  .form-group input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-size: 15px; font-family: inherit; padding: 11px 14px; outline: none; }
+  .form-group input:focus { border-color: #58a6ff; }
+  .form-group input::placeholder { color: var(--text3); }
+  .btn-login { width: 100%; padding: 13px; background: var(--build-bg); border: 1px solid var(--build-border); border-radius: var(--radius); color: #79c0ff; font-size: 15px; font-family: inherit; font-weight: 700; cursor: pointer; margin-top: 4px; transition: all 0.12s; }
+  .btn-login:hover { background: rgba(31,111,235,0.28); }
+  .login-err { font-size: 13px; color: #ffa198; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 18px; display: none; }
+
+  /* Admin panel */
+  .admin-wrap { display: none; }
+  .top-bar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .top-bar h1 { font-size: 16px; font-weight: 700; }
+  .top-bar-right { display: flex; align-items: center; gap: 16px; }
+  .admin-user { font-size: 13px; color: var(--text2); }
+  .btn-logout { font-size: 13px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; }
+  .btn-logout:hover { color: var(--text); }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 28px 16px; }
+
+  .stats { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 22px; flex: 1; min-width: 130px; }
+  .stat-val { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .stat-lbl { font-size: 12px; color: var(--text2); }
+
+  .grid-header { display: grid; grid-template-columns: 72px 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .grid-header span { font-size: 15px; font-weight: 700; text-align: center; color: var(--text); padding: 10px 0; background: var(--bg3); border-radius: 6px; border: 1px solid var(--border2); }
+  .grid-header span .en { display: block; font-size: 12px; color: var(--text2); font-weight: 400; margin-top: 2px; }
+
+  .slot-row { display: grid; grid-template-columns: 72px 1fr 1fr 1fr; gap: 6px; margin-bottom: 5px; align-items: stretch; }
+  .time-lbl { font-size: 13px; color: var(--text3); text-align: right; padding-right: 12px; display: flex; align-items: center; justify-content: flex-end; }
+  .slot { min-height: 48px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); display: flex; align-items: center; padding: 6px 10px; gap: 8px; }
+  .slot.taken-build    { background: var(--build-bg);    border-color: var(--build-border); }
+  .slot.taken-research { background: var(--research-bg); border-color: var(--research-border); }
+  .slot.taken-train    { background: var(--train-bg);    border-color: var(--train-border); }
+
+  .slot-info { min-width: 0; flex: 1; }
+  .slot-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-name.build    { color: #79c0ff; }
+  .slot-name.research { color: #7ee787; }
+  .slot-name.train    { color: #e3b341; }
+  .slot-fid { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .btn-del { background: none; border: 1px solid var(--danger-border); border-radius: 4px; color: var(--danger); font-size: 12px; font-family: inherit; cursor: pointer; padding: 4px 9px; white-space: nowrap; flex-shrink: 0; transition: all 0.12s; }
+  .btn-del:hover { background: var(--danger-bg); }
+
+  /* Confirm dialog */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .overlay.open { display: flex; }
+  .dialog { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 100%; max-width: 360px; }
+  .dialog h2 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+  .dialog p { font-size: 14px; color: var(--text2); margin-bottom: 24px; line-height: 1.7; white-space: pre-line; }
+  .dialog-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-dlg-cancel { padding: 10px 20px; background: transparent; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-size: 14px; font-family: inherit; cursor: pointer; }
+  .btn-dlg-del    { padding: 10px 20px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); color: #ffa198; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <h1>🔐 後台管理登入 / Admin Login</h1>
+    <p>State 483 — BUFF 預約系統 / Booking System</p>
+    <div class="login-err" id="loginErr"></div>
+    <div class="form-group">
+      <label>帳號 / Username</label>
+      <input type="text" id="loginUser" placeholder="管理員帳號 / Admin username" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>密碼 / Password</label>
+      <input type="password" id="loginPass" placeholder="密碼 / Password" autocomplete="current-password">
+    </div>
+    <button class="btn-login" onclick="doLogin()">登入 / Login</button>
+  </div>
+</div>
+
+<!-- Admin Panel -->
+<div class="admin-wrap" id="adminWrap">
+  <div class="top-bar">
+    <h1>⚙️ 後台管理 / Admin — 準備週 BUFF 預約 / Prep Week</h1>
+    <div class="top-bar-right">
+      <span class="admin-user" id="adminUserLabel"></span>
+      <button class="btn-logout" onclick="doLogout()">登出 / Logout</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="stats">
+      <div class="stat-card"><div class="stat-val" id="statTotal">—</div><div class="stat-lbl">總預約數 / Total</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#79c0ff" id="statBuild">—</div><div class="stat-lbl">建築 / Building</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#7ee787" id="statResearch">—</div><div class="stat-lbl">研發 / Research</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#e3b341" id="statTrain">—</div><div class="stat-lbl">練兵 / Training</div></div>
+    </div>
+
+    <div class="grid-header">
+      <span style="background:transparent;border-color:transparent"></span>
+      <span>🏗 建築<span class="en">Building</span></span>
+      <span>🔬 研發<span class="en">Research</span></span>
+      <span>⚔️ 練兵<span class="en">Training</span></span>
+    </div>
+    <div id="slotsContainer"></div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="overlay" id="delOverlay">
+  <div class="dialog">
+    <h2>確認取消預約 / Confirm Delete</h2>
+    <p id="delDesc"></p>
+    <div class="dialog-btns">
+      <button class="btn-dlg-cancel" onclick="closeDelDialog()">返回 / Back</button>
+      <button class="btn-dlg-del"    onclick="confirmDelete()">確認取消 / Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BUFFS = ['build','research','train'];
+const BUFF_ZH = {build:'建築', research:'研發', train:'練兵'};
+let adminToken = localStorage.getItem('wos_admin_token') || '';
+let adminUser  = localStorage.getItem('wos_admin_user')  || '';
+let currentDay = 0;
+let bookings = {};
+let pendingDeleteKey = null;
+
+function tLabel(i){ return String(Math.floor(i/2)).padStart(2,'0')+(i%2===0?':00':':30'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  if (!username || !password) { errEl.textContent='請填寫帳號與密碼 / Please enter credentials'; errEl.style.display='block'; return; }
+  try {
+    const res = await fetch('/api/admin/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if (data.token) {
+      adminToken = data.token; adminUser = data.username;
+      localStorage.setItem('wos_admin_token', adminToken);
+      localStorage.setItem('wos_admin_user', adminUser);
+      showAdmin();
+    } else {
+      errEl.textContent = data.error || '登入失敗 / Login failed';
+      errEl.style.display = 'block';
+    }
+  } catch(e) { errEl.textContent='連線失敗 / Connection failed'; errEl.style.display='block'; }
+}
+
+async function doLogout() {
+  try { await fetch('/api/admin/logout', {method:'POST', headers:{'x-admin-token': adminToken}}); } catch(e) {}
+  adminToken = ''; adminUser = '';
+  localStorage.removeItem('wos_admin_token');
+  localStorage.removeItem('wos_admin_user');
+  document.getElementById('adminWrap').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+}
+
+function showAdmin() {
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('adminWrap').style.display='block';
+  document.getElementById('adminUserLabel').textContent = `登入中 / Logged in: ${adminUser}`;
+  fetchBookings();
+}
+
+async function fetchBookings() {
+  try {
+    const res = await fetch('/api/admin/bookings', {headers:{'x-admin-token': adminToken}});
+    if (res.status === 401) { doLogout(); return; }
+    bookings = await res.json();
+    updateStats();
+    renderSlots();
+  } catch(e) {}
+}
+
+function updateStats() {
+  let b=0, r=0, t=0;
+  for (const k of Object.keys(bookings)) {
+    if (k.endsWith('_build'))    b++;
+    else if (k.endsWith('_research')) r++;
+    else if (k.endsWith('_train'))    t++;
+  }
+  document.getElementById('statBuild').textContent    = b;
+  document.getElementById('statResearch').textContent = r;
+  document.getElementById('statTrain').textContent    = t;
+  document.getElementById('statTotal').textContent    = b+r+t;
+}
+
+function renderSlots() {
+  let html = '';
+  for (let s = 0; s < 48; s++) {
+    html += `<div class="slot-row"><div class="time-lbl">${tLabel(s)}</div>`;
+    for (const buff of BUFFS) {
+      const key = `${s}_${buff}`;
+      const entry = bookings[key];
+      if (entry) {
+        html += `<div class="slot taken-${buff}">
+          <div class="slot-info">
+            <div class="slot-name ${buff}">${esc(entry.name)}</div>
+            <div class="slot-fid">FID: ${esc(entry.fid)}</div>
+          </div>
+          <button class="btn-del" onclick="openDelDialog('${key}','${esc(entry.name)}','${buff}',${s})">取消 / Delete</button>
+        </div>`;
+      } else {
+        html += `<div class="slot"></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  document.getElementById('slotsContainer').innerHTML = html;
+}
+
+function openDelDialog(key, name, buff, slot) {
+  pendingDeleteKey = key;
+  const end = slot < 47 ? tLabel(slot+1) : '24:00';
+  document.getElementById('delDesc').textContent =
+    `玩家：${name}\n時段：${tLabel(slot)} – ${end}（${BUFF_ZH[buff]} BUFF）\n\n此操作無法復原。This cannot be undone.`;
+  document.getElementById('delOverlay').classList.add('open');
+}
+
+function closeDelDialog() {
+  document.getElementById('delOverlay').classList.remove('open');
+  pendingDeleteKey = null;
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteKey) return;
+  try {
+    const res = await fetch(`/api/admin/bookings/${encodeURIComponent(pendingDeleteKey)}`, {
+      method:'DELETE', headers:{'x-admin-token': adminToken}
+    });
+    const data = await res.json();
+    if (data.success) { closeDelDialog(); fetchBookings(); }
+    else alert('刪除失敗 / Delete failed: ' + (data.error||''));
+  } catch(e) { alert('網路錯誤 / Network error'); }
+}
+
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('delOverlay').addEventListener('click', e => { if(e.target===document.getElementById('delOverlay')) closeDelDialog(); });
+
+if (adminToken) showAdmin();
+setInterval(() => { if (adminToken) fetchBookings(); }, 15000);
+</script>
+</body>
+</html>
