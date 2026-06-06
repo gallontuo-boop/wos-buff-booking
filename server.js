@@ -91,8 +91,20 @@ app.post('/api/bookings', (req, res) => {
   }
   const key = `${slot}_${buff}`;
   const bookings = loadBookings();
+
+  // 同一 FID 在同一欄（同一天）只能填一次
+  const fidStr = String(fid);
+  const duplicateInSameDay = Object.entries(bookings).some(
+    ([k, v]) => k.endsWith(`_${buff}`) && v.fid === fidStr
+  );
+  if (duplicateInSameDay) {
+    return res.status(409).json({
+      error: 'Each person can only book once per day. If you made a mistake and need to change, please contact Gallon/Han.'
+    });
+  }
+
   if (bookings[key]) return res.status(409).json({ error: '此時段已被預約 / Slot already booked' });
-  bookings[key] = { name, fid: String(fid), avatar: avatar || '', bookedAt: new Date().toISOString() };
+  bookings[key] = { name, fid: fidStr, avatar: avatar || '', bookedAt: new Date().toISOString() };
   saveBookings(bookings);
   res.json({ success: true });
 });
